@@ -1,4 +1,4 @@
-# CPTC Team Runbook
+# CPTC Team Runbook i hate my team
 
 Starter repo structured after the UC Irvine (checklists/reporting) and RIT (setup/scripts) competition repos.
 The point: by competition day this folder is muscle memory — every command verified by YOU during training.
