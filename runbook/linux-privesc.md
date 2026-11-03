@@ -18,6 +18,7 @@ writable /etc/passwd:    # mkpasswd -m SHA-512, add root-uid line
 
 ## Tools you will run
 - linPEAS/linpeas.sh
+- `scripts/local-linux-enum.sh` (repo) — the UCI CCDC inventory one-shot for host context FIRST (who/where/what services are on this box); run it before the privesc hunt list so you know which findings are worth pursuing with 30 minutes of the clock left
 - pspy (cron hunt)
 - LinEnum, kernelpop
 

@@ -1,4 +1,4 @@
-# CPTC Team Runbook i hate my team
+# CPTC Team Runbook
 
 Starter repo structured after the UC Irvine (checklists/reporting) and RIT (setup/scripts) competition repos.
 The point: by competition day this folder is muscle memory — every command verified by YOU during training.
@@ -8,6 +8,7 @@ The point: by competition day this folder is muscle memory — every command ver
 - `runbook/` — one cheat-sheet per domain. Fill these from HTB Academy while you learn (start empty, finish filled).
 - `drills/` — timing drills and practice routines.
 - `setup/` — **your attack-box installer.** `setup/install.sh` builds a full Kali box from zero (Purdue-style, adapted). `--kit` also fetches the portable "carry folder" binaries (peass/pspy/ligolo/chisel), `--services` also starts the practice collab stack (kanban + local CyberChef). See `setup/purduestyle.md` for the philosophy. `setup/tmux-keys.sh` adds keyboard shortcuts to tmux — run once on any attack box and read the explanation below.
+- `scripts/` — host-side tools you run **on a machine you're standing in** (enumeration only, no changes made to targets). `scripts/local-linux-enum.sh` (credited to UCI CCDC) prints a full Linux host inventory in one shot: hostname/IP/user, listening ports + PIDs, Docker containers (running AND stopped), human + sudo users, domain-join status via `/etc/krb5.conf`, fstab mounts, service-tied processes, Kubernetes role, and which known services are installed (web/mail/DB/VPN/monitoring/PHP everywhere). First command to run after landing on a Linux box — its output is a report-ready picture and tells you which of your other playbooks apply (see `runbook/linux-privesc.md`).
 - `notes/` — reference notes extracted from other teams (UCI + RIT) live in `UCI-notes/` next to this.
 
 ### tmux quick-keys (`setup/tmux-keys.sh`)
