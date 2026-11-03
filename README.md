@@ -7,7 +7,7 @@ The point: by competition day this folder is muscle memory — every command ver
 
 - `runbook/` — one cheat-sheet per domain. Fill these from HTB Academy while you learn (start empty, finish filled).
 - `drills/` — timing drills and practice routines.
-- `setup/` — **your attack-box installer.** `setup/install.sh` builds a full Kali box from zero (Purdue-style, adapted). `--kit` also fetches the portable "carry folder" binaries (peass/pspy/ligolo/chisel), `--services` also starts the practice collab stack (kanban + local CyberChef). See `setup/purduestyle.md` for the philosophy. `setup/tmux-keys.sh` adds keyboard shortcuts to tmux — run once on any attack box and read the explanation below.
+- `setup/` — **your attack-box installer.** `setup/install.sh` builds a full Kali box from zero (Purdue-style, adapted). `--kit` also fetches extra portable binaries, `--services` also starts the practice collab stack (kanban + local CyberChef), **`--rdp` makes the Kali accept RDP connections** (competition-day flow, below). See `setup/purduestyle.md` for the philosophy. `setup/tmux-keys.sh` adds keyboard shortcuts to tmux — run once on any attack box and read the explanation below.
 - `scripts/` — host-side tools you run **on a machine you're standing in** (enumeration only, no changes made to targets). `scripts/local-linux-enum.sh` (credited to UCI CCDC) prints a full Linux host inventory in one shot: hostname/IP/user, listening ports + PIDs, Docker containers (running AND stopped), human + sudo users, domain-join status via `/etc/krb5.conf`, fstab mounts, service-tied processes, Kubernetes role, and which known services are installed (web/mail/DB/VPN/monitoring/PHP everywhere). First command to run after landing on a Linux box — its output is a report-ready picture and tells you which of your other playbooks apply (see `runbook/linux-privesc.md`).
 - `notes/` — reference notes extracted from other teams (UCI + RIT) live in `UCI-notes/` next to this.
 
@@ -31,6 +31,25 @@ Details baked into the script:
 - Run it on every fresh attack box. `Alt+N` then becomes part of the logged workflow:
   `Alt+1` = scans and sweeps, `Alt+2` = working shell + `tee`d logs, `Alt+g` = the listener,
   and the bottom-left `[enum] 0:kerbrute*` strip you already use on Fluffy stays visible in all of them.
+
+## Competition-day RDP bootstrap ("Windows box → RDP into our Kali")
+
+Last year's pattern, rehearsed in advance:
+
+1. On the Kali box you will RDP into later (as your normal user):
+   ```bash
+   sudo apt-get update && sudo apt-get install -y git curl
+   git clone https://github.com/nationalcptc-teamtools/Florida-Atlantic-University
+   bash Florida-Atlantic-University/setup/install.sh --rdp
+   ```
+   One run installs every tool on the team list (`runbook`, `drills`, `report-generator` all included since they clone with the repo) and enables the RDP listener on :3389.
+2. From the Windows box: `mstsc` → Kali IP → your Kali username/password → full desktop.
+3. Cross-platform binaries live in the carry folder `~/.local/share/teamtools/tools`
+   (linpeas.sh / winPEASx64.exe / pspy64 / ligolo / chisel / SharpHound) — copy onto targets when needed.
+4. Then run the tmux-keys script once and follow the session layout (below) for logging discipline.
+Caveat: if the competition network has no internet, only the apt phase fails — run this installer
+on your own Kali VM beforehand (it fetches the cross-platform carry folder). Bring that folder as
+your offline plan B and copy binaries with whatever transfer the rules of those days allow.
 
 ## The session layout (what should be open while working an HTB box)
 

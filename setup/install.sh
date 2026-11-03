@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
 # CPTC team attack-box installer — Kali Linux amd64
 # Modeled on the perdue/teamtools approach: one script, zero dead time.
-# Run: ./install.sh            (core toolkit)
-#      ./install.sh --services (core + docker collab stack for PRACTICE sessions)
-#      ./install.sh --kit      (core + portable offline kit fetch)
+# Run: ./install.sh              (core toolkit)
+#      ./install.sh --services   (core + docker collab stack for PRACTICE sessions)
+#      ./install.sh --kit        (core + extra portable offline kit)
+#      ./install.sh --rdp        (core + accept RDP into this Kali — competition-day flow:
+#                                 Windows VDI box → RDP into our Kali; enable after install)
+# Competition-day bootstrap (VDI Kali has no auth yet): sudo apt-get update && sudo apt-get install -y git
+#   then: git clone https://github.com/nationalcptc-teamtools/Florida-Atlantic-University && bash Florida-Atlantic-University/setup/install.sh --rdp
 set -euo pipefail
 
-mode_services=false; mode_kit=false
+mode_services=false; mode_kit=false; mode_rdp=false
 for arg in "${@:-}"; do
   case "$arg" in
     --services) mode_services=true ;;
     --kit)      mode_kit=true ;;
-    *) echo "Usage: $0 [--services] [--kit]" >&2; exit 2 ;;
+    --rdp)      mode_rdp=true ;;
+    *) echo "Usage: $0 [--services] [--kit] [--rdp]" >&2; exit 2 ;;
   esac
 done
 
@@ -29,15 +34,20 @@ mkdir -p "$data/src" "$data/tools" "$bin"
 echo "[*] Phase 1/4 — packages"
 sudo apt-get update
 sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    ca-certificates curl git unzip jq build-essential golang-go \
+    ca-certificates curl wget git unzip jq nano \
+    build-essential gcc golang-go debsums htop \
     python3-venv python3-dev pipx \
-    nmap smbclient ldap-utils dnsutils snmp onesixtyone rpcbind nfs-common \
+    nmap smbclient smbmap enum4linux enum4linux-ng netexec ldap-utils \
+    dnsutils snmp onesixtyone rpcbind nfs-common \
     default-mysql-client postgresql-client \
     krb5-user proxychains4 socat netcat-openbsd \
-    hashcat john wordlists seclists \
-    enum4linux-ng responder mitm6 \
-    chromium gowitness nuclei ffuf feroxbuster whatweb sqlmap rustscan \
-    tmux perl ruby-dev libkrb5-dev libreadline-dev freerdp3-x11 \
+    hashcat john wordlists seclists hydra \
+    gobuster feroxbuster whatweb sqlmap rustscan nuclei ffuf \
+    zaproxy burpsuite \
+    net-tools iptables iproute2 ufw rkhunter \
+    bloodhound \
+    chromium gowitness responder mitm6 \
+    tmux perl ruby-dev libkrb5-dev libreadline-dev freerdp3-x11 xrdp xorgxrdp \
     oathtool mono-devel docker.io docker-compose
 
 echo "[*] Phase 2/4 — pipx tools (modern AD + web chain)"
@@ -73,6 +83,17 @@ fetch https://github.com/nicocha30/ligolo-ng/releases/download/v0.8.2/ligolo-ng_
 fetch https://github.com/jpillora/chisel/releases/download/v1.10.1/chisel_1.10.1_linux_amd64.gz  "$data/tools/chisel-linux.gz"
 fetch https://github.com/jpillora/chisel/releases/download/v1.10.1/chisel_1.10.1_windows_amd64.exe.gz "$data/tools/chisel-windows.gz"
 
+echo "[*] SharpHound collector (runs ON a Windows host once you land there)"
+fetch "$(curl -fsSL https://api.github.com/repos/SpecterOps/SharpHound/releases/latest | jq -er '[.assets[] | select(.name | test("windows_x86.zip")) | .browser_download_url] | .[0]')" "$data/tools/sharphound.zip"
+unzip -o "$data/tools/sharphound.zip" -d "$data/tools/sharphound" && rm "$data/tools/sharphound.zip"
+
+if $mode_rdp; then
+  echo "[*] RDP into this Kali (competition-day flow: CPTC Windows box → RDP to our Kali)"
+  sudo adduser xrdp ssl-cert 2>/dev/null || true
+  sudo systemctl enable --now xrdp
+  echo "    RDP listener on :3389 — test from the Windows VDI box with mstsc (Kali user creds)."
+fi
+
 # tmux config (oh-my-tmux, Purdue-style)
 if [[ -e "$HOME/.tmux.conf" || -L "$HOME/.tmux.conf" ]]; then
   mv "$HOME/.tmux.conf" "$HOME/.tmux.conf.$(date -u +%Y%m%dT%H%M%S).bak"
@@ -83,9 +104,7 @@ ln -sfn "$data/src/oh-my-tmux/.tmux.conf" "$HOME/.tmux.conf"
 chmod +x "$data/tools/"* 2>/dev/null || true
 
 if $mode_kit; then
-  echo "[*] extra kit: SharpHound + out-of-band file-drop binaries"
-  fetch "$(curl -fsSL https://api.github.com/repos/SpecterOps/SharpHound/releases/latest | jq -er '[.assets[] | select(.name | test("windows_x86.zip")) | .browser_download_url] | .[0]')" "$data/tools/sharphound.zip"
-  unzip -o "$data/tools/sharphound.zip" -d "$data/tools/sharphound" && rm "$data/tools/sharphound.zip"
+  echo "[*] extra kit: out-of-band file-drop binaries"
   fetch https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEAS.bat "$data/tools/winPEAS.bat"
 fi
 
@@ -98,4 +117,5 @@ fi
 echo
 echo "Done. Tools dir: $data/tools"
 echo "PATH additions:  export PATH=\"$bin:\$PATH\""
-echo "The kit folder to carry: $data/tools  (winPEAS/linpeas/pspy/ligolo/chisel)"
+echo "The kit folder to carry: $data/tools  (winPEAS/linpeas/pspy/ligolo/chisel/SharpHound)"
+[[ -e /usr/bin/bloodhound ]] && echo "BloodHound GUI: launch 'bloodhound'; feed it with bloodhound-ce-python collector output (upgrading to BH Community Edition later is a documented option)."
