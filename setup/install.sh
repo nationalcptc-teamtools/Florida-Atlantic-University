@@ -51,8 +51,8 @@ sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     nikto wpscan davtest autorecon cewl metasploit-framework wireshark samba \
     oathtool mono-devel docker.io docker-compose
 
-echo "[*] Phase 2/4 — pipx tools (modern AD + web chain)"
-pipx_install() { command -v "$1" >/dev/null 2>&1 || pipx install "$2"; }
+echo "[*] Phase 2/4 — pipx tools (modern AD + web chain) — best-effort: no internet = skip, apt phase already done"
+pipx_install() { command -v "$1" >/dev/null 2>&1 || pipx install "$2" || echo "  ! pipx $1 failed (skipped)"; }
 pipx_install nxc                "git+https://github.com/Pennyw0rth/NetExec.git"
 pipx_install secretsdump.py     impacket
 pipx_install certipy            certipy-ad
@@ -64,14 +64,14 @@ pipx_install manspider          man-spider
 pipx_install targetedKerberoast targetedKerberoast
 pipx_install sstimap            sstimap
 
-echo "[*] Phase 3/4 — source-cloned & go tools"
-clone() { [[ -d "$data/src/$2/.git" ]] || git clone --depth 1 "https://github.com/$1.git" "$data/src/$2"; }
+echo "[*] Phase 3/4 — source-cloned & go tools — best-effort"
+clone() { [[ -d "$data/src/$2/.git" ]] || git clone --depth 1 "https://github.com/$1.git" "$data/src/$2" || echo "  ! clone $2 failed (skipped)"; }
 clone dirkjanm/krbrelayx      krbrelayx
 clone dirkjanm/PKINITtools    gettgtpkinit
 clone gpakosz/.tmux           oh-my-tmux
 
-command -v kerbrute >/dev/null 2>&1 || go install github.com/ropnop/kerbrute@v1.0.3
-command -v evil-winrm >/dev/null 2>&1 || sudo gem install evil-winrm --no-document
+command -v kerbrute >/dev/null 2>&1 || go install github.com/ropnop/kerbrute@v1.0.3 || echo "  ! kerbrute build failed (skipped — carry-folder binary fallback)"
+command -v evil-winrm >/dev/null 2>&1 || sudo gem install evil-winrm --no-document || echo "  ! evil-winrm install failed (skipped)"
 
 echo "[*] Phase 4/4 — portable binaries you redistribute onto targets"
 fetch() { local t; t=$(mktemp "$data/tools/.dl.XXXXXX"); curl -fL --retry 3 "$1" -o "$t" && mv "$t" "$2" || { rm -f "$t"; echo "  ! failed: $1 (skipped — update URL or grab manually)"; }; }
@@ -84,9 +84,14 @@ fetch https://github.com/nicocha30/ligolo-ng/releases/download/v0.8.2/ligolo-ng_
 fetch https://github.com/jpillora/chisel/releases/download/v1.10.1/chisel_1.10.1_linux_amd64.gz  "$data/tools/chisel-linux.gz"
 fetch https://github.com/jpillora/chisel/releases/download/v1.10.1/chisel_1.10.1_windows_amd64.exe.gz "$data/tools/chisel-windows.gz"
 
-echo "[*] SharpHound collector (runs ON a Windows host once you land there)"
-fetch "$(curl -fsSL https://api.github.com/repos/SpecterOps/SharpHound/releases/latest | jq -er '[.assets[] | select(.name | test("windows_x86.zip")) | .browser_download_url] | .[0]')" "$data/tools/sharphound.zip"
-unzip -o "$data/tools/sharphound.zip" -d "$data/tools/sharphound" && rm "$data/tools/sharphound.zip"
+echo "[*] SharpHound collector (runs ON a Windows host once you land there) — best-effort"
+sh_url=$(curl -fsSL https://api.github.com/repos/SpecterOps/SharpHound/releases/latest 2>/dev/null | jq -er '[.assets[] | select(.name | test("windows_x86.zip")) | .browser_download_url] | .[0]' 2>/dev/null || true)
+if [[ -n "${sh_url:-}" ]]; then
+  fetch "$sh_url" "$data/tools/sharphound.zip"
+  unzip -o "$data/tools/sharphound.zip" -d "$data/tools/sharphound" && rm "$data/tools/sharphound.zip"
+else
+  echo "  ! SharpHound release lookup failed (skipped)"
+fi
 
 if $mode_rdp; then
   echo "[*] RDP into this Kali (competition-day flow: CPTC Windows box → RDP to our Kali)"
@@ -95,12 +100,16 @@ if $mode_rdp; then
   echo "    RDP listener on :3389 — test from the Windows VDI box with mstsc (Kali user creds)."
 fi
 
-# tmux config (oh-my-tmux, Purdue-style)
-if [[ -e "$HOME/.tmux.conf" || -L "$HOME/.tmux.conf" ]]; then
-  mv "$HOME/.tmux.conf" "$HOME/.tmux.conf.$(date -u +%Y%m%dT%H%M%S).bak"
+# tmux config (oh-my-tmux, Purdue-style) — only if the clone actually landed
+if [[ -d "$data/src/oh-my-tmux/.git" ]]; then
+  if [[ -e "$HOME/.tmux.conf" || -L "$HOME/.tmux.conf" ]]; then
+    mv "$HOME/.tmux.conf" "$HOME/.tmux.conf.$(date -u +%Y%m%dT%H%M%S).bak"
+  fi
+  ln -sfn "$data/src/oh-my-tmux/.tmux.conf" "$HOME/.tmux.conf"
+  [[ -e "$HOME/.tmux.conf.local" ]] || cnf=${XDG_CONFIG_HOME:-$HOME/.config}/tmux; mkdir -p "$cnf" 2>/dev/null || true
+else
+  echo "  ! oh-my-tmux not cloned — keeping existing tmux.conf (run setup/tmux-keys.sh instead)"
 fi
-ln -sfn "$data/src/oh-my-tmux/.tmux.conf" "$HOME/.tmux.conf"
-[[ -e "$HOME/.tmux.conf.local" ]] || cnf=${XDG_CONFIG_HOME:-$HOME/.config}/tmux; mkdir -p "$cnf" 2>/dev/null || true
 
 chmod +x "$data/tools/"* 2>/dev/null || true
 
