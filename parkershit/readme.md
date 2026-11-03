@@ -10,7 +10,7 @@ sqlmap, privesc) per `CCDC-command-dictionary.md`.
 > wherever you're standing. From Kali:
 >
 > ```bash
-> cd "/mnt/c/Users/morta/OneDrive/Pictures/Documents/Default Project/cptc2026"
+> cd to your fucking repo place
 > ```
 
 ---
