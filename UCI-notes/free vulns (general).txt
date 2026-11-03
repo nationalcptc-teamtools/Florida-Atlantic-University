@@ -1,0 +1,7 @@
+﻿Mail stuff
+Sslscan to see if TLS version is less than 1.3
+sslscan IP
+No UAC (check with netexec)
+No host based firewall (can access database)
+Anon access in shares
+Deprecated windows server or Windows 10 versions
