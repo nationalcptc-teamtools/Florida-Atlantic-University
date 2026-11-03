@@ -48,6 +48,7 @@ sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     bloodhound \
     chromium gowitness responder mitm6 \
     tmux perl ruby-dev libkrb5-dev libreadline-dev freerdp3-x11 xrdp xorgxrdp \
+    nikto wpscan davtest autorecon cewl metasploit-framework wireshark samba \
     oathtool mono-devel docker.io docker-compose
 
 echo "[*] Phase 2/4 — pipx tools (modern AD + web chain)"
