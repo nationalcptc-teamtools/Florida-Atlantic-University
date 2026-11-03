@@ -44,7 +44,7 @@ sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     hashcat john wordlists seclists hydra \
     gobuster feroxbuster whatweb sqlmap rustscan nuclei ffuf \
     zaproxy burpsuite \
-    net-tools iptables iproute2 ufw rkhunter \
+    net-tools iproute2 ufw rkhunter \
     bloodhound \
     chromium gowitness responder mitm6 \
     tmux perl ruby-dev libkrb5-dev libreadline-dev freerdp3-x11 xrdp xorgxrdp \
