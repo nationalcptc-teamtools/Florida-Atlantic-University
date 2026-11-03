@@ -46,9 +46,9 @@ Typical length: **10–18 content slides** (winners were lean).
 - Judge-facing framing for Butters Family Farm: expansion/investor due-diligence language,
   strengths section included, short/long-term remediation cards.
 
-## Follow-up (not done yet — backlog)
+## Follow-up (backlog)
 
-- Deep findings-inventory extraction from the 12 *report* PDFs (agent digestion incomplete at
-  deadline) — next session: mine 2–3 reports for the exact small-findings density pattern and
-  fold into `master-vuln-checklist.md` §G.
+- ~~Mine report PDFs~~ **DONE 2026-11-03:** OCR'd finals-A (76pp) via local Tesseract pipeline —
+  findings folded into `master-vuln-checklist.md` §G. Finals-C (79pp) OCR'd, text staged in
+  Temp for a later pass; E–L reports remain unmined (OCR chain now exists on this box).
 - 2r.is "how to CPTC" blog was unreachable tonight — retry and mine for tactics.

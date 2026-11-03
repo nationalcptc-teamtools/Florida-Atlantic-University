@@ -84,11 +84,19 @@ Rule: **found → evidence screenshot → one-liner in findings file → keep hu
 - [ ] Plaintext protocols in production (telnet, ftp, http logins)
 - [ ] Service banners leaking versions/architecture (info disclosure)
 
-## G. "Small findings" the globals reports showed DO score
-- Missing security headers · missing AV/EDR · missing log/audit config · naming/user hygiene
-- (dormant accounts, shared accounts) · unrotated passwords · default pages left installed ·
-- self-signed/expired certs · missing firewall · outdated anything with banner proof ·
-- documentation with internal IPs leaked (info disclosure).
+## G. "Small findings" — PROOF they score (CPTC10 globals, finals team A: 26 findings)
+
+Team A's actual severity spread: **1 Critical, 7 High, 4 Medium, 4 Low, 10 Info/other —
+and they were a FINALS team.** The majority of a finalist's report was NOT big exploits.
+Their finding types (from the redacted report itself):
+- Cleartext password (Critical 9.8 — the single biggest finding was a *password*, not an exploit)
+- Admin account exposure · Exchange misconfig (unauthorized mail send) · API endpoint authz
+- SMB share file exposure · stored XSS · NTLMv1 allowed · NTLM relay signing gaps
+- Missing account lockout · exposed interpreter (GOLASH) · unrestricted file upload
+- Missing HTTP security headers · no rate limiting (chatbot) · self-signed/expired cert config
+- Outdated/vulnerable service on 10.0.1.6 · platform-wide misconfigs (yyy.chat)
+→ **Moral: the cleartext password beat every exploit in their report.** Hunt credentials and
+config hygiene FIRST (sections A/B), screenshots always, severity honestly small when small.
 
 ## Usage law
 1. Triage order: A/B in parallel with F while C/D/E deepen per-host — the [report generator]
