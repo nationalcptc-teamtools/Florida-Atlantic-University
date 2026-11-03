@@ -74,8 +74,21 @@ for u in $(cat "$SITES"); do
 done
 [ -f "$OUT/whatweb.txt" ] && cat "$OUT/whatweb.txt"
 
-# --- 3. QUICK WINS: the free stuff ------------------------------------------
-echo "[*] [3/5] checking classic exposures (git, env, robots, admin paths)..."
+# --- 3. WAF CHECK: know if the target fights back -------------------------------
+echo "[*] [3/6] WAF detection (wafw00f, ~2s per target)..."
+if has wafw00f; then
+    : > "$OUT/waf.txt"
+    for u in $(cat "$SITES"); do
+        wafw00f "$u" 2>/dev/null | grep -E 'is behind|seems to be|No WAF detected|Generic' \
+            >> "$OUT/waf.txt" || true
+    done
+    [ -s "$OUT/waf.txt" ] && cat "$OUT/waf.txt" || echo "[i] no WAF entries (or nothing detected)"
+else
+    echo "[i] wafw00f not installed (install.sh adds it) — skipping WAF check"
+fi
+
+# --- 4. QUICK WINS: the free stuff ------------------------------------------
+echo "[*] [4/6] checking classic exposures (git, env, robots, admin paths)..."
 QUICK="robots.txt .git/HEAD .env .DS_Store server-status /admin /api /api/v1 \
 /swagger /swagger.json /openapi.json /graphql /actuator /actuator/health \
 /.htaccess /sitemap.xml /backup.zip /phpinfo.php"
@@ -91,10 +104,19 @@ for u in $(cat "$SITES"); do
         esac
     done
 done
-[ -f "$OUT/quick-wins.txt" ] && echo "[+] QUICK WINS FOUND:" && cat "$OUT/quick-wins.txt"
 
-# --- 4. DIRECTORY BRUTEFORCE -------------------------------------------------
-echo "[*] [4/5] ffuf directory bust (small list, fast)..."
+# exposed .git = full source dump — spell out the next move on the spot
+if grep -qsE '^200 GET .*\.git/HEAD' "$OUT/quick-wins.txt"; then
+    GITHOST=$(grep -E '^200 GET .*\.git/HEAD' "$OUT/quick-wins.txt" | head -1 | awk '{print $3}' | sed 's#/.git/HEAD##')
+    echo "" >> "$OUT/quick-wins.txt"
+    echo "EXPOSED .git ON $GITHOST — dump the whole repo, this is source + deleted files:" >> "$OUT/quick-wins.txt"
+    echo "  git-dumper $GITHOST/.git/ $OUT/git-dump/" >> "$OUT/quick-wins.txt"
+    echo "  then: grep -riE 'pass|key|secret|token|flag' $OUT/git-dump/ | head -50" >> "$OUT/quick-wins.txt"
+    [ -s "$OUT/quick-wins.txt" ] && echo "[+] QUICK WINS FOUND:" && cat "$OUT/quick-wins.txt"
+fi
+
+# --- 5. DIRECTORY BRUTEFORCE -------------------------------------------------
+echo "[*] [5/6] ffuf directory bust (small list, fast)..."
 WORDLIST="/usr/share/seclists/Discovery/Web-Content/common.txt"
 [ -f "$WORDLIST" ] || WORDLIST="/usr/share/wordlists/dirb/common.txt"
 if has ffuf && [ -s "$SITES" ]; then
@@ -118,8 +140,8 @@ if command -v python3 >/dev/null 2>&1 && [ -f "$SCRIPT_DIR/testing/ffuf_pretty.p
     python3 "$SCRIPT_DIR/testing/ffuf_pretty.py" "$OUT" 2>/dev/null || true
 fi
 
-# --- 5. KNOWN-VULN SCAN -------------------------------------------------------
-echo "[*] [5/5] nuclei (templates: tech + cves + exposed things)..."
+# --- 6. KNOWN-VULN SCAN -------------------------------------------------------
+echo "[*] [6/6] nuclei (templates: tech + cves + exposed things)..."
 if has nuclei; then
     nuclei -l "$SITES" -severity low,medium,high,critical \
         -silent -o "$OUT/nuclei.txt"
@@ -135,7 +157,7 @@ ls -1 "$OUT" 2>/dev/null | sed 's/^/  /'
 echo ""
 echo " NEXT (manual -- this is where the exploit lives):"
 echo "  1. cat $OUT/nmap-web.txt   -> what web server? what app?"
-echo "  2. curl the quick-wins     -> .git/? .env? api? "
+echo "  2. curl the quick-wins     -> .git/? .env? api? (git-dumper cmd is written into quick-wins.txt)"
 echo "  3. ffuf output             -> hidden admin panels, upload pages"
 echo "  4. Open top 3 in browser, look at HTML source + JS files"
 echo "  5. Screenshot EVERYTHING now. Future-you writing the report thanks you."

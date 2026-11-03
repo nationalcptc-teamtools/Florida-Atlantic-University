@@ -1,0 +1,12 @@
+# runtime junk — never commit (patterns unanchored to match any depth)
+loot/
+install-fails.txt
+app.log
+app.pid
+__pycache__/
+*.pyc
+*.tar.gz
+*.db
+
+# nested reference clone (UF team repo) — never commit
+uf-cptc-tools/

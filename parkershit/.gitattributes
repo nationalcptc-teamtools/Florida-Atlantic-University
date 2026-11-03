@@ -1,0 +1,3 @@
+# shell/python files must stay LF or bash breaks on Linux VMs ("bash\r" error)
+*.sh  text eol=lf
+*.py  text eol=lf
