@@ -7,8 +7,29 @@ The point: by competition day this folder is muscle memory — every command ver
 
 - `runbook/` — one cheat-sheet per domain. Fill these from HTB Academy while you learn (start empty, finish filled).
 - `drills/` — timing drills and practice routines.
-- `setup/` — **your attack-box installer.** `setup/install.sh` builds a full Kali box from zero (Purdue-style, adapted). `--kit` also fetches the portable "carry folder" binaries (peass/pspy/ligolo/chisel), `--services` also starts the practice collab stack (kanban + local CyberChef). See `setup/purduestyle.md` for the philosophy.
+- `setup/` — **your attack-box installer.** `setup/install.sh` builds a full Kali box from zero (Purdue-style, adapted). `--kit` also fetches the portable "carry folder" binaries (peass/pspy/ligolo/chisel), `--services` also starts the practice collab stack (kanban + local CyberChef). See `setup/purduestyle.md` for the philosophy. `setup/tmux-keys.sh` adds keyboard shortcuts to tmux — run once on any attack box and read the explanation below.
 - `notes/` — reference notes extracted from other teams (UCI + RIT) live in `UCI-notes/` next to this.
+
+### tmux quick-keys (`setup/tmux-keys.sh`)
+
+Why this matters on competition day: the session layout (below) only works if you can move between
+"scan window / working shell / logs window" fast enough to keep notes alive. tmux's defaults make you
+type prefix-key-and-Arrow to switch windows, which is slow and makes logging a chore — and an unlogged
+session is losing the report its evidence.
+
+Running it once (inside tmux) writes to `~/.tmux.conf`:
+
+| Key | Effect |
+|---|---|
+| `Alt+1` … `Alt+9` | jump straight to tmux window 1–9 — no prefix key |
+| `Alt+g` | open a new window (it's named `M-g`, "**g**o make one") |
+
+Details baked into the script:
+- **Idempotent:** greps `.tmux.conf` first — running it twice won't duplicate bindings.
+- **Wins vs. losing bindings:** appends don't override anything you already customized.
+- Run it on every fresh attack box. `Alt+N` then becomes part of the logged workflow:
+  `Alt+1` = scans and sweeps, `Alt+2` = working shell + `tee`d logs, `Alt+g` = the listener,
+  and the bottom-left `[enum] 0:kerbrute*` strip you already use on Fluffy stays visible in all of them.
 
 ## The session layout (what should be open while working an HTB box)
 
